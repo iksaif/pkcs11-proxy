@@ -3,5 +3,5 @@
 include /usr/share/cdbs/1/class/cmake.mk
 include /usr/share/cdbs/1/rules/debhelper.mk
 
-DEB_CMAKE_INSTALL_PREFIX=/opt/commonit/
+DEB_CMAKE_INSTALL_PREFIX=/opt/commonit/usr/
 DEB_DH_BUILDDEB_ARGS=--destdir=$(HOME)/pkg-pool

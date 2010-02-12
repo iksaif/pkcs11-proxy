@@ -1,1 +1,1 @@
-debian/tmp/opt/commonit/lib/libpkcs11-proxy*.so.*	/opt/commonit/usr/lib
+debian/tmp/opt/commonit/usr/lib/libpkcs11-proxy*.so*	/opt/commonit/usr/lib
