@@ -1,0 +1,21 @@
+Source: pkcs11-proxy
+Priority: extra
+Maintainer: Corentin Chary <cchary@commonit.com>
+Build-Depends: cdbs, debhelper (>= 6), cmake
+Standards-Version: 3.8.0
+Section: libs
+
+Package: pkcs11-proxy1
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Recommends:
+Description: pkcs11-proxy
+ A pkcs11 proxy to use pkcs11 over the network
+
+Package: pkcs11-daemon
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Recommends:
+Description: pkcs11-proxy
+ A pkcs11 daemon to talk with pkcs11-proxy
+
