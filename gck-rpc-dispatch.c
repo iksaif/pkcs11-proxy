@@ -369,18 +369,6 @@ proto_read_attribute_buffer(CallState * cs, CK_ATTRIBUTE_PTR * result,
 		    (&msg->buffer, msg->parsed, &msg->parsed, &value))
 			return PARSE_ERROR;
 
-		/* FIXME
-		  +                        if (value == sizeof (uint64_t) &&
-		  +                            value != sizeof (CK_ULONG)) {
-		  +                            CK_ULONG attr;
-		  +
-		  +                            value = sizeof (CK_ULONG);
-		  +                            attr = *(uint64_t *)data;
-		  +                            *(CK_ULONG *)data = attr;
-		  +                        }
-		  +                        attrs[i].pValue = (CK_VOID_PTR)data;
-		  +                        attrs[i].ulValueLen = value;
-		*/
 		if (value == 0) {
 			attrs[i].pValue = NULL;
 			attrs[i].ulValueLen = 0;
@@ -458,6 +446,16 @@ proto_read_attribute_array(CallState * cs, CK_ATTRIBUTE_PTR * result,
 				return PARSE_ERROR;
 			}
 
+			CK_ULONG a;
+
+			if (value == sizeof (uint64_t) &&
+			    value != sizeof (CK_ULONG) &&
+			    gck_rpc_has_ulong_parameter(attrs[i].type)) {
+
+				value = sizeof (CK_ULONG);
+				a = *(uint64_t *)data;
+				*(CK_ULONG *)data = a;
+			}
 			attrs[i].pValue = (CK_VOID_PTR) data;
 			attrs[i].ulValueLen = value;
 		} else {

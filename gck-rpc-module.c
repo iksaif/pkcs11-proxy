@@ -763,13 +763,14 @@ proto_read_attribute_array(GckRpcMessage * msg, CK_ATTRIBUTE_PTR arr,
 
 					/* Wants attribute data, enough space */
 				} else {
+					CK_ULONG a;
+
 					/* Attribute len is an integer, but
 					 * does not match CK_ULONG size, it's certainly
 					 * a CK_ULONG from a different platform */
 					if (attrlen == sizeof(uint64_t) &&
-					    attrlen != sizeof(CK_ULONG)) {
-						CK_ULONG a;
-
+					    sizeof(CK_ULONG) != sizeof(uint64_t) &&
+					    gck_rpc_has_ulong_parameter(attr->type)) {
 						attrlen = sizeof(CK_ULONG);
 						a = *(uint64_t *) attrval;
 						attrval = (unsigned char *)&a;

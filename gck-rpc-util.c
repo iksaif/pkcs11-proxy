@@ -201,3 +201,31 @@ int gck_rpc_mechanism_has_no_parameters(CK_MECHANISM_TYPE mech)
 		return 0;
 	};
 }
+
+int
+gck_rpc_has_ulong_parameter(CK_ATTRIBUTE_TYPE type)
+{
+	switch (type) {
+	case CKA_CLASS:
+	case CKA_KEY_TYPE:
+	case CKA_CERTIFICATE_TYPE:
+	case CKA_HW_FEATURE_TYPE:
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+int
+gck_rpc_has_bad_sized_ulong_parameter(CK_ATTRIBUTE_PTR attr)
+{
+	if (!attr->pValue)
+		return 0;
+	/* All this parameters are transmited on the network
+	 * as 64bit integers */
+	if (sizeof (uint64_t) != attr->ulValueLen)
+		return 0;
+	if (sizeof (CK_ULONG) == attr->ulValueLen)
+		return 0;
+	return gck_rpc_has_ulong_parameter(attr->type);
+}

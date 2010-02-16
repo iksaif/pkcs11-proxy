@@ -248,19 +248,6 @@ gck_rpc_message_write_attribute_buffer(GckRpcMessage * msg,
 	return !egg_buffer_has_error(&msg->buffer);
 }
 
-static int
-gck_rpc_attribute_need_resize(CK_ATTRIBUTE_PTR attr)
-{
-	if (sizeof(CK_ULONG) == attr->ulValueLen &&
-	    sizeof(CK_ULONG) != sizeof(uint64_t) && attr->pValue) {
-		if (attr->type == CKA_CLASS || attr->type == CKA_KEY_TYPE
-		    || attr->type == CKA_CERTIFICATE_TYPE
-		    || attr->type == CKA_HW_FEATURE_TYPE)
-			return 1;
-	}
-	return 0;
-}
-
 int
 gck_rpc_message_write_attribute_array(GckRpcMessage * msg,
 				      CK_ATTRIBUTE_PTR arr, CK_ULONG num)
@@ -291,15 +278,10 @@ gck_rpc_message_write_attribute_array(GckRpcMessage * msg,
 		/* The attribute length and value */
 		if (validity) {
 			egg_buffer_add_uint32(&msg->buffer, attr->ulValueLen);
-			if (gck_rpc_attribute_need_resize(attr)) {
-				/* FIXME
-				   uint64_t val = *(CK_ULONG *)attr->pValue;
+			if (gck_rpc_has_bad_sized_ulong_parameter(attr)) {
+				uint64_t val = *(CK_ULONG *)attr->pValue;
 
-				   attr->ulValueLen = sizeof (uint64_t);
-				   egg_buffer_add_byte_array (&msg->buffer, (unsigned char *)&val, attr->ulValueLen);
-				 */
-				egg_buffer_add_byte_array(&msg->buffer, attr->pValue,
-							  attr->ulValueLen);
+				egg_buffer_add_byte_array (&msg->buffer, (unsigned char *)&val, sizeof (val));
 			} else
 				egg_buffer_add_byte_array(&msg->buffer, attr->pValue,
 							  attr->ulValueLen);
