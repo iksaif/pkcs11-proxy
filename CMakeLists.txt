@@ -1,5 +1,9 @@
 cmake_minimum_required (VERSION 2.4)
 
+if(COMMAND cmake_policy)
+      cmake_policy(SET CMP0003 NEW)
+endif(COMMAND cmake_policy)
+
 project (pkcs11 C)
 
 set(PKCS11_PROXY_SRCS gck-rpc-module.c gck-rpc-message.c gck-rpc-util.c egg-buffer.c)
