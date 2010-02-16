@@ -421,7 +421,7 @@ static CK_RV call_write(CallState * cs, unsigned char *data, size_t len)
 			return CKR_DEVICE_ERROR;
 		}
 
-		r = write(fd, data, len);
+		r = send(fd, data, len, 0);
 
 		if (r == -1) {
 			if (errno == EPIPE) {
@@ -460,7 +460,7 @@ static CK_RV call_read(CallState * cs, unsigned char *data, size_t len)
 			return CKR_DEVICE_ERROR;
 		}
 
-		r = read(fd, data, len);
+		r = recv(fd, data, len, 0);
 
 		if (r == 0) {
 			warning(("couldn't receive data: daemon closed connection"));
