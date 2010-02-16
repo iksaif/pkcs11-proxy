@@ -2191,7 +2191,7 @@ void gck_rpc_layer_accept(void)
 
 	error = pthread_create(&ds->thread, NULL,
 			       run_dispatch_thread, &(ds->socket));
-	if (!error) {
+	if (error) {
 		gck_rpc_warn("couldn't start thread: %s", strerror(errno));
 		close(new_fd);
 		free(ds);
