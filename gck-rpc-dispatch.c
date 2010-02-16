@@ -2245,13 +2245,17 @@ int gck_rpc_layer_initialize(const char *prefix, CK_FUNCTION_LIST_PTR module)
 		if (ip)
 			p = strchr(ip, ':');
 
-		if (!p || !ip) {
+		if (!ip) {
 			gck_rpc_warn("invalid syntax for pkcs11 socket : %s",
 				     prefix);
 			return -1;
 		}
-		*p = '\0';
-		port = strtol(p + 1, NULL, 0);
+
+		if (p) {
+			*p = '\0';
+			port = strtol(p + 1, NULL, 0);
+		} else
+			port = 0;
 
 		sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
