@@ -71,9 +71,13 @@ static CK_FUNCTION_LIST_PTR pkcs11_module = NULL;
 #define return_val_if_fail(x, v) \
 	if (!(x)) { rpc_warn ("'%s' not true at %s", #x, __func__); return v; }
 
-void gck_rpc_log(const char *line)
+void gck_rpc_log(const char *msg, ...)
 {
-	printf("%s", line);
+	va_list ap;
+
+	va_start(ap, msg);
+	vfprintf(stdout, msg, ap);
+	va_end(ap);
 }
 
 /* -------------------------------------------------------------------------------
@@ -84,7 +88,7 @@ typedef struct _CallState {
 	GckRpcMessage *req;
 	GckRpcMessage *resp;
 	void *allocated;
-	CK_ULONG appid;
+	uint64_t appid;
 } CallState;
 
 static int call_init(CallState * cs)
@@ -832,9 +836,7 @@ static CK_RV rpc_C_Finalize(CallState * cs)
 			    (pkcs11_module->C_GetSlotList) (TRUE, slots,
 							    &n_slots);
 			for (i = 0; ret == CKR_OK && i < n_slots; ++i) {
-				appartment =
-				    CK_GNOME_MAKE_APPARTMENT(slots[i],
-							     cs->appid);
+				appartment = slots[i];
 				ret =
 				    (pkcs11_module->
 				     C_CloseAllSessions) (appartment);
@@ -880,7 +882,6 @@ static CK_RV rpc_C_GetSlotInfo(CallState * cs)
 
 	BEGIN_CALL(C_GetSlotInfo);
 	IN_ULONG(slot_id);
-	slot_id = CK_GNOME_MAKE_APPARTMENT(slot_id, cs->appid);
 	PROCESS_CALL((slot_id, &info));
 	OUT_SLOT_INFO(info);
 	END_CALL;
@@ -895,7 +896,6 @@ static CK_RV rpc_C_GetTokenInfo(CallState * cs)
 
 	BEGIN_CALL(C_GetTokenInfo);
 	IN_ULONG(slot_id);
-	slot_id = CK_GNOME_MAKE_APPARTMENT(slot_id, cs->appid);
 	PROCESS_CALL((slot_id, &info));
 	OUT_TOKEN_INFO(info);
 	END_CALL;
@@ -911,7 +911,6 @@ static CK_RV rpc_C_GetMechanismList(CallState * cs)
 
 	BEGIN_CALL(C_GetMechanismList);
 	IN_ULONG(slot_id);
-	slot_id = CK_GNOME_MAKE_APPARTMENT(slot_id, cs->appid);
 	IN_ULONG_BUFFER(mechanism_list, count);
 	PROCESS_CALL((slot_id, mechanism_list, &count));
 	OUT_ULONG_ARRAY(mechanism_list, count);
@@ -928,7 +927,6 @@ static CK_RV rpc_C_GetMechanismInfo(CallState * cs)
 
 	BEGIN_CALL(C_GetMechanismInfo);
 	IN_ULONG(slot_id);
-	slot_id = CK_GNOME_MAKE_APPARTMENT(slot_id, cs->appid);
 	IN_ULONG(type);
 	PROCESS_CALL((slot_id, type, &info));
 	OUT_MECHANISM_INFO(info);
@@ -946,7 +944,6 @@ static CK_RV rpc_C_InitToken(CallState * cs)
 
 	BEGIN_CALL(C_InitToken);
 	IN_ULONG(slot_id);
-	slot_id = CK_GNOME_MAKE_APPARTMENT(slot_id, cs->appid);
 	IN_BYTE_ARRAY(pin, pin_len);
 	IN_STRING(label);
 	PROCESS_CALL((slot_id, pin, pin_len, label));
@@ -978,7 +975,6 @@ static CK_RV rpc_C_OpenSession(CallState * cs)
 
 	BEGIN_CALL(C_OpenSession);
 	IN_ULONG(slot_id);
-	slot_id = CK_GNOME_MAKE_APPARTMENT(slot_id, cs->appid);
 	IN_ULONG(flags);
 	PROCESS_CALL((slot_id, flags, NULL, NULL, &session));
 	OUT_ULONG(session);
@@ -1003,7 +999,6 @@ static CK_RV rpc_C_CloseAllSessions(CallState * cs)
 
 	BEGIN_CALL(C_CloseAllSessions);
 	IN_ULONG(slot_id);
-	slot_id = CK_GNOME_MAKE_APPARTMENT(slot_id, cs->appid);
 	PROCESS_CALL((slot_id));
 	END_CALL;
 }
@@ -2062,7 +2057,11 @@ static void run_dispatch_loop(int sock)
 	assert(sock != -1);
 
 	/* The client application */
-	cs.appid = 0;
+	if (!read_all(sock, (unsigned char *)&cs.appid, sizeof (cs.appid))) {
+		return ;
+	}
+	gck_rpc_log("New session %d-%d\n", (uint32_t) (cs.appid >> 32),
+		    (uint32_t) cs.appid);
 
 	/* Setup our buffers */
 	if (!call_init(&cs)) {
@@ -2228,7 +2227,7 @@ int gck_rpc_layer_initialize(const char *prefix, CK_FUNCTION_LIST_PTR module)
 
 		iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
 		if (iResult != 0) {
-			printf("WSAStartup failed: %d\n", iResult);
+			gck_rpc_warn("WSAStartup failed: %d\n", iResult);
 			return -1;
 		}
         }
@@ -2334,7 +2333,7 @@ int gck_rpc_layer_initialize(const char *prefix, CK_FUNCTION_LIST_PTR module)
 			 "%s:%d", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port));
 	}
 
-	printf("Listening on: %s\n", pkcs11_socket_path);
+	gck_rpc_log("Listening on: %s\n", pkcs11_socket_path);
 
 	pkcs11_module = module;
 	pkcs11_socket = sock;

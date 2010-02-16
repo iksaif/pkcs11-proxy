@@ -293,7 +293,7 @@ int gck_rpc_message_read_space_string(GckRpcMessage * msg,
 
 int gck_rpc_message_read_version(GckRpcMessage * msg, CK_VERSION * version);
 
-void gck_rpc_log(const char *line);
+void gck_rpc_log(const char *msg, ...);
 
 void gck_rpc_warn(const char *msg, ...);
 

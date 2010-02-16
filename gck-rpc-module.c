@@ -62,6 +62,7 @@ static pthread_mutex_t init_mutex = PTHREAD_MUTEX_INITIALIZER;
 /* Whether we've been initialized, and on what process id it happened */
 static int pkcs11_initialized = 0;
 static pid_t pkcs11_initialized_pid = 0;
+static uint64_t pkcs11_app_id = 0;
 
 /* The socket to connect to */
 static char pkcs11_socket_path[MAXPATHLEN] = { 0, };
@@ -84,9 +85,13 @@ static char pkcs11_socket_path[MAXPATHLEN] = { 0, };
 #define return_val_if_fail(x, v) \
 	if (!(x)) { gck_rpc_warn ("'%s' not true at %s", #x, __func__); return v; }
 
-void gck_rpc_log(const char *line)
+void gck_rpc_log(const char *msg, ...)
 {
-	fprintf(stderr, "%s\n", line);
+	va_list ap;
+
+	va_start(ap, msg);
+	vfprintf(stderr, msg, ap);
+	va_end(ap);
 }
 
 /* -----------------------------------------------------------------------------
@@ -218,6 +223,95 @@ static void *call_allocator(void *p, size_t sz)
 	return res;
 }
 
+static void call_disconnect(CallState * cs)
+{
+	assert(cs);
+
+	if (cs->socket != -1) {
+		debug(("disconnected socket"));
+		close(cs->socket);
+		cs->socket = -1;
+	}
+}
+
+/* Write all data to session socket.  */
+static CK_RV call_write(CallState * cs, unsigned char *data, size_t len)
+{
+	int fd, r;
+
+	assert(cs);
+	assert(data);
+	assert(len > 0);
+
+	while (len > 0) {
+
+		fd = cs->socket;
+		if (fd == -1) {
+			warning(("couldn't send data: socket has been closed"));
+			return CKR_DEVICE_ERROR;
+		}
+
+		r = send(fd, data, len, 0);
+
+		if (r == -1) {
+			if (errno == EPIPE) {
+				warning(("couldn't send data: daemon closed connection"));
+				call_disconnect(cs);
+				return CKR_DEVICE_ERROR;
+			} else if (errno != EAGAIN && errno != EINTR) {
+				warning(("couldn't send data: %s",
+					 strerror(errno)));
+				return CKR_DEVICE_ERROR;
+			}
+		} else {
+			debug(("wrote %d bytes", r));
+			data += r;
+			len -= r;
+		}
+	}
+
+	return CKR_OK;
+}
+
+/* Read a certain amount of data from session socket. */
+static CK_RV call_read(CallState * cs, unsigned char *data, size_t len)
+{
+	int fd, r;
+
+	assert(cs);
+	assert(data);
+	assert(len > 0);
+
+	while (len > 0) {
+
+		fd = cs->socket;
+		if (fd == -1) {
+			warning(("couldn't receive data: session socket has been closed"));
+			return CKR_DEVICE_ERROR;
+		}
+
+		r = recv(fd, data, len, 0);
+
+		if (r == 0) {
+			warning(("couldn't receive data: daemon closed connection"));
+			call_disconnect(cs);
+			return CKR_DEVICE_ERROR;
+		} else if (r == -1) {
+			if (errno != EAGAIN && errno != EINTR) {
+				warning(("couldn't receive data: %s",
+					 strerror(errno)));
+				return CKR_DEVICE_ERROR;
+			}
+		} else {
+			debug(("read %d bytes", r));
+			data += r;
+			len -= r;
+		}
+	}
+
+	return CKR_OK;
+}
+
 static CK_RV call_connect(CallState * cs)
 {
 	struct sockaddr_un addr;
@@ -304,18 +398,8 @@ static CK_RV call_connect(CallState * cs)
 	cs->call_status = CALL_READY;
 	debug(("connected socket"));
 
-	return CKR_OK;
-}
-
-static void call_disconnect(CallState * cs)
-{
-	assert(cs);
-
-	if (cs->socket != -1) {
-		debug(("disconnected socket"));
-		close(cs->socket);
-		cs->socket = -1;
-	}
+	return call_write(cs, (unsigned char*)&pkcs11_app_id,
+			  sizeof(pkcs11_app_id));
 }
 
 static void call_destroy(void *value)
@@ -401,84 +485,6 @@ static CK_RV call_prepare(CallState * cs, int call_id)
 
 	/* Ready to fill in arguments */
 	cs->call_status = CALL_PREP;
-	return CKR_OK;
-}
-
-/* Write all data to session socket.  */
-static CK_RV call_write(CallState * cs, unsigned char *data, size_t len)
-{
-	int fd, r;
-
-	assert(cs);
-	assert(data);
-	assert(len > 0);
-
-	while (len > 0) {
-
-		fd = cs->socket;
-		if (fd == -1) {
-			warning(("couldn't send data: socket has been closed"));
-			return CKR_DEVICE_ERROR;
-		}
-
-		r = send(fd, data, len, 0);
-
-		if (r == -1) {
-			if (errno == EPIPE) {
-				warning(("couldn't send data: daemon closed connection"));
-				call_disconnect(cs);
-				return CKR_DEVICE_ERROR;
-			} else if (errno != EAGAIN && errno != EINTR) {
-				warning(("couldn't send data: %s",
-					 strerror(errno)));
-				return CKR_DEVICE_ERROR;
-			}
-		} else {
-			debug(("wrote %d bytes", r));
-			data += r;
-			len -= r;
-		}
-	}
-
-	return CKR_OK;
-}
-
-/* Read a certain amount of data from session socket. */
-static CK_RV call_read(CallState * cs, unsigned char *data, size_t len)
-{
-	int fd, r;
-
-	assert(cs);
-	assert(data);
-	assert(len > 0);
-
-	while (len > 0) {
-
-		fd = cs->socket;
-		if (fd == -1) {
-			warning(("couldn't receive data: session socket has been closed"));
-			return CKR_DEVICE_ERROR;
-		}
-
-		r = recv(fd, data, len, 0);
-
-		if (r == 0) {
-			warning(("couldn't receive data: daemon closed connection"));
-			call_disconnect(cs);
-			return CKR_DEVICE_ERROR;
-		} else if (r == -1) {
-			if (errno != EAGAIN && errno != EINTR) {
-				warning(("couldn't receive data: %s",
-					 strerror(errno)));
-				return CKR_DEVICE_ERROR;
-			}
-		} else {
-			debug(("read %d bytes", r));
-			data += r;
-			len -= r;
-		}
-	}
-
 	return CKR_OK;
 }
 
@@ -1254,6 +1260,9 @@ static CK_RV rpc_C_Initialize(CK_VOID_PTR init_args)
 			pkcs11_socket_path[sizeof(pkcs11_socket_path) - 1] = 0;
 		}
 	}
+
+	srand(time(NULL) ^ pid);
+	pkcs11_app_id = (uint64_t) rand() << 32 | rand();
 
 	/* Call through and initialize the daemon */
 	ret = call_lookup(&cs);
