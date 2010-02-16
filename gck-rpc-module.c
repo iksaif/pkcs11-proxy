@@ -30,11 +30,15 @@
 
 #include <sys/types.h>
 #include <sys/param.h>
-#include <sys/socket.h>
-#include <sys/un.h>
+#ifdef __MINGW32__
+# include <winsock2.h>
+#else
+# include <sys/socket.h>
+# include <sys/un.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#endif
 
 #include <stdlib.h>
 #include <limits.h>
@@ -280,12 +284,14 @@ static CK_RV call_connect(CallState * cs)
 		}
 	}
 
-	/* close on exec */
+#ifndef __MINGW32__
+        /* close on exec */
 	if (fcntl(sock, F_SETFD, 1) == -1) {
 		close(sock);
 		warning(("couldn't secure socket: %s", strerror(errno)));
 		return CKR_DEVICE_ERROR;
 	}
+#endif
 
 	if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
 		close(sock);

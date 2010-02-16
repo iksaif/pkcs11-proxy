@@ -2006,7 +2006,7 @@ static int read_all(int sock, unsigned char *data, size_t len)
 
 	while (len > 0) {
 
-		r = recv(sock, data, len, 0);
+                r = recv(sock, (void *)data, len, 0);
 
 		if (r == 0) {
 			/* Connection was closed on client */
@@ -2035,7 +2035,7 @@ static int write_all(int sock, unsigned char *data, size_t len)
 
 	while (len > 0) {
 
-		r = send(sock, data, len, 0);
+                r = send(sock, (void *)data, len, 0);
 
 		if (r == -1) {
 			if (errno == EPIPE) {
@@ -2204,18 +2204,6 @@ void gck_rpc_layer_accept(void)
 	pkcs11_dispatchers = ds;
 }
 
-#ifdef  __MINGW32__
-int inet_aton(const char * cp, struct in_addr *pin)
-{
-        int rc = inet_addr(cp);
-        if (rc == -1 && strcmp(cp, "255.255.255.255"))
-                return 0;
-
-        pin->s_addr = rc;
-        return 1;
-}
-#endif
-
 int gck_rpc_layer_initialize(const char *prefix, CK_FUNCTION_LIST_PTR module)
 {
 	struct sockaddr_un addr;
@@ -2281,7 +2269,7 @@ int gck_rpc_layer_initialize(const char *prefix, CK_FUNCTION_LIST_PTR module)
                 }
 
 		if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
-			       &one, sizeof(one)) == -1) {
+                               (char *)&one, sizeof(one)) == -1) {
 			gck_rpc_warn
 			    ("couldn't create set pkcs11 socket options : %s",
 			     strerror(errno));
