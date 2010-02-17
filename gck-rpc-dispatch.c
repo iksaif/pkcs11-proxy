@@ -867,7 +867,7 @@ static CK_RV rpc_C_Finalize(CallState * cs)
 	for (ds = pkcs11_dispatchers; ds; ds = next) {
 		CallState *c = &ds->cs;
 
-		next = ds->next;
+                next = ds->next;
 
 		if (c->appid != cs->appid)
 			continue ;
@@ -876,7 +876,7 @@ static CK_RV rpc_C_Finalize(CallState * cs)
 		if (c->req &&
 		    c->req->call_id == GCK_RPC_CALL_C_WaitForSlotEvent) {
 			gck_rpc_log("Sending interuption signal to %d\n",
-				    cs->sock);
+                                    ds->socket);
 			if (ds->socket)
 				shutdown(ds->socket, SHUT_RDWR);
 			//pthread_kill(ds->thread, SIGINT);
