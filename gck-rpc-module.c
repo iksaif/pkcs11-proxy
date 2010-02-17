@@ -338,7 +338,7 @@ static CK_RV call_connect(CallState * cs)
 		if (!p || !ip) {
 			gck_rpc_warn("invalid syntax for pkcs11 socket : %s",
 				     pkcs11_socket_path);
-			return -1;
+			return CKR_DEVICE_ERROR;
 		}
 		*p = '\0';
 		port = strtol(p + 1, NULL, 0);
@@ -348,7 +348,7 @@ static CK_RV call_connect(CallState * cs)
 		if (sock < 0) {
 			gck_rpc_warn("couldn't create pkcs11 socket: %s",
 				     strerror(errno));
-			return -1;
+			return CKR_DEVICE_ERROR;
 		}
 
 		if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
@@ -356,14 +356,14 @@ static CK_RV call_connect(CallState * cs)
 			gck_rpc_warn
 			    ("couldn't create set pkcs11 socket options : %s",
 			     strerror(errno));
-			return -1;
+			return CKR_DEVICE_ERROR;
 		}
 
 		addr.sun_family = AF_INET;
 		if (inet_aton(ip, &((struct sockaddr_in *)&addr)->sin_addr) ==
 		    0) {
 			gck_rpc_warn("bad inet address : %s", ip);
-			return -1;
+			return CKR_DEVICE_ERROR;
 		}
 		((struct sockaddr_in *)&addr)->sin_port = htons(port);
 	} else {
