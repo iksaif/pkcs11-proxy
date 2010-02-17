@@ -89,6 +89,7 @@ typedef struct _CallState {
 	GckRpcMessage *resp;
 	void *allocated;
 	uint64_t appid;
+	int sock;
 } CallState;
 
 static int call_init(CallState * cs)
@@ -2048,23 +2049,22 @@ static int write_all(int sock, unsigned char *data, size_t len)
 	return 1;
 }
 
-static void run_dispatch_loop(int sock)
+static void run_dispatch_loop(CallState *cs)
 {
-	CallState cs;
 	unsigned char buf[4];
 	uint32_t len;
 
-	assert(sock != -1);
+	assert(cs->sock != -1);
 
 	/* The client application */
-	if (!read_all(sock, (unsigned char *)&cs.appid, sizeof (cs.appid))) {
+	if (!read_all(cs->sock, (unsigned char *)&cs->appid, sizeof (cs->appid))) {
 		return ;
 	}
-	gck_rpc_log("New session %d-%d\n", (uint32_t) (cs.appid >> 32),
-		    (uint32_t) cs.appid);
+	gck_rpc_log("New session %d-%d\n", (uint32_t) (cs->appid >> 32),
+		    (uint32_t) cs->appid);
 
 	/* Setup our buffers */
-	if (!call_init(&cs)) {
+	if (!call_init(cs)) {
 		gck_rpc_warn("out of memory");
 		return;
 	}
@@ -2072,10 +2072,10 @@ static void run_dispatch_loop(int sock)
 	/* The main thread loop */
 	while (TRUE) {
 
-		call_reset(&cs);
+		call_reset(cs);
 
 		/* Read the number of bytes ... */
-		if (!read_all(sock, buf, 4))
+		if (!read_all(cs->sock, buf, 4))
 			break;
 
 		/* Calculate the number of bytes */
@@ -2087,46 +2087,46 @@ static void run_dispatch_loop(int sock)
 		}
 
 		/* Allocate memory */
-		egg_buffer_reserve(&cs.req->buffer, cs.req->buffer.len + len);
-		if (egg_buffer_has_error(&cs.req->buffer)) {
+		egg_buffer_reserve(&cs->req->buffer, cs->req->buffer.len + len);
+		if (egg_buffer_has_error(&cs->req->buffer)) {
 			gck_rpc_warn("error allocating buffer for message");
 			break;
 		}
 
 		/* ... and read/parse in the actual message */
-		if (!read_all(sock, cs.req->buffer.buf, len))
+		if (!read_all(cs->sock, cs->req->buffer.buf, len))
 			break;
 
-		egg_buffer_add_empty(&cs.req->buffer, len);
+		egg_buffer_add_empty(&cs->req->buffer, len);
 
-		if (!gck_rpc_message_parse(cs.req, GCK_RPC_REQUEST))
+		if (!gck_rpc_message_parse(cs->req, GCK_RPC_REQUEST))
 			break;
 
 		/* ... send for processing ... */
-		if (!dispatch_call(&cs))
+		if (!dispatch_call(cs))
 			break;
 
 		/* .. send back response length, and then response data */
-		egg_buffer_encode_uint32(buf, cs.resp->buffer.len);
-		if (!write_all(sock, buf, 4) ||
-		    !write_all(sock, cs.resp->buffer.buf, cs.resp->buffer.len))
+		egg_buffer_encode_uint32(buf, cs->resp->buffer.len);
+		if (!write_all(cs->sock, buf, 4) ||
+		    !write_all(cs->sock, cs->resp->buffer.buf, cs->resp->buffer.len))
 			break;
 	}
 
-	call_uninit(&cs);
+	call_uninit(cs);
 }
 
 static void *run_dispatch_thread(void *arg)
 {
-	int *sock = arg;
-	assert(*sock != -1);
+	CallState *cs = arg;
+	assert(cs->sock != -1);
 
-	run_dispatch_loop(*sock);
+	run_dispatch_loop(cs);
 
 	/* The thread closes the socket and marks as done */
-	assert(*sock != -1);
-	close(*sock);
-	*sock = -1;
+	assert(cs->sock != -1);
+	close(cs->sock);
+	cs->sock = -1;
 
 	return NULL;
 }
@@ -2138,6 +2138,7 @@ static void *run_dispatch_thread(void *arg)
 typedef struct _DispatchState {
 	struct _DispatchState *next;
 	pthread_t thread;
+	CallState cs;
 	int socket;
 } DispatchState;
 
@@ -2187,9 +2188,10 @@ void gck_rpc_layer_accept(void)
 	}
 
 	ds->socket = new_fd;
+	ds->cs.sock = new_fd;
 
 	error = pthread_create(&ds->thread, NULL,
-			       run_dispatch_thread, &(ds->socket));
+			       run_dispatch_thread, &(ds->cs));
 	if (error) {
 		gck_rpc_warn("couldn't start thread: %s", strerror(errno));
 		close(new_fd);
