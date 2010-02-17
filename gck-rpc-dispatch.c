@@ -56,6 +56,28 @@ static CK_FUNCTION_LIST_PTR pkcs11_module = NULL;
 #define PARSE_ERROR CKR_DEVICE_ERROR
 #define PREP_ERROR  CKR_DEVICE_MEMORY
 
+typedef struct _CallState {
+	GckRpcMessage *req;
+	GckRpcMessage *resp;
+	void *allocated;
+	uint64_t appid;
+	int call;
+	int sock;
+} CallState;
+
+typedef struct _DispatchState {
+	struct _DispatchState *next;
+	pthread_t thread;
+	CallState cs;
+	int socket;
+} DispatchState;
+
+/* A linked list of dispatcher threads */
+static DispatchState *pkcs11_dispatchers = NULL;
+
+/* A mutex to protect the dispatcher list */
+static pthread_mutex_t pkcs11_dispatchers_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 /* -----------------------------------------------------------------------------
  * LOGGING and DEBUGGING
  */
@@ -83,14 +105,6 @@ void gck_rpc_log(const char *msg, ...)
 /* -------------------------------------------------------------------------------
  * CALL STRUCTURES
  */
-
-typedef struct _CallState {
-	GckRpcMessage *req;
-	GckRpcMessage *resp;
-	void *allocated;
-	uint64_t appid;
-	int sock;
-} CallState;
 
 static int call_init(CallState * cs)
 {
@@ -812,6 +826,8 @@ static CK_RV rpc_C_Finalize(CallState * cs)
 	CK_ULONG n_slots, i;
 	CK_SLOT_ID appartment;
 	CK_RV ret;
+	DispatchState *ds, *next;
+
 
 	debug(("C_Finalize: enter"));
 
@@ -845,6 +861,28 @@ static CK_RV rpc_C_Finalize(CallState * cs)
 			free(slots);
 		}
 	}
+
+	/* Make all C_WaitForSlotEvent calls return */
+	pthread_mutex_lock(&pkcs11_dispatchers_mutex);
+	for (ds = pkcs11_dispatchers; ds; ds = next) {
+		CallState *c = &ds->cs;
+
+		next = ds->next;
+
+		if (c->appid != cs->appid)
+			continue ;
+		if (c->sock == cs->sock)
+			continue ;
+		if (c->req &&
+		    c->req->call_id == GCK_RPC_CALL_C_WaitForSlotEvent) {
+			gck_rpc_log("Sending interuption signal to %d\n",
+				    cs->sock);
+			if (ds->socket)
+				shutdown(ds->socket, SHUT_RDWR);
+			//pthread_kill(ds->thread, SIGINT);
+		}
+	}
+	pthread_mutex_unlock(&pkcs11_dispatchers_mutex);
 
 	debug(("ret: %d", ret));
 	return ret;
@@ -2135,21 +2173,11 @@ static void *run_dispatch_thread(void *arg)
  * MAIN THREAD
  */
 
-typedef struct _DispatchState {
-	struct _DispatchState *next;
-	pthread_t thread;
-	CallState cs;
-	int socket;
-} DispatchState;
-
 /* The main daemon socket that we're listening on */
 static int pkcs11_socket = -1;
 
 /* The unix socket path, that we listen on */
 static char pkcs11_socket_path[MAXPATHLEN] = { 0, };
-
-/* A linked list of dispatcher threads */
-static DispatchState *pkcs11_dispatchers = NULL;
 
 void gck_rpc_layer_accept(void)
 {
@@ -2162,6 +2190,7 @@ void gck_rpc_layer_accept(void)
 	assert(pkcs11_socket != -1);
 
 	/* Cleanup any completed dispatch threads */
+	pthread_mutex_lock(&pkcs11_dispatchers_mutex);
 	for (here = &pkcs11_dispatchers, ds = *here; ds != NULL; ds = *here) {
 		if (ds->socket == -1) {
 			pthread_join(ds->thread, NULL);
@@ -2201,6 +2230,7 @@ void gck_rpc_layer_accept(void)
 
 	ds->next = pkcs11_dispatchers;
 	pkcs11_dispatchers = ds;
+	pthread_mutex_unlock(&pkcs11_dispatchers_mutex);
 }
 
 int gck_rpc_layer_initialize(const char *prefix, CK_FUNCTION_LIST_PTR module)
@@ -2362,6 +2392,7 @@ void gck_rpc_layer_uninitialize(void)
 	pkcs11_socket_path[0] = 0;
 
 	/* Stop all of the dispatch threads */
+	pthread_mutex_lock(&pkcs11_dispatchers_mutex);
 	for (ds = pkcs11_dispatchers; ds; ds = next) {
 		next = ds->next;
 
@@ -2374,6 +2405,7 @@ void gck_rpc_layer_uninitialize(void)
 		assert(ds->socket == -1);
 		free(ds);
 	}
+	pthread_mutex_unlock(&pkcs11_dispatchers_mutex);
 
 	pkcs11_module = NULL;
 }
