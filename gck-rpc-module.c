@@ -73,7 +73,6 @@ static char pkcs11_socket_path[MAXPATHLEN] = { 0, };
 /* -----------------------------------------------------------------------------
  * LOGGING and DEBUGGING
  */
-#undef DEBUG_OUTPUT
 #define DEBUG_OUTPUT 0
 #if DEBUG_OUTPUT
 #define debug(x) gck_rpc_debug x
@@ -91,6 +90,7 @@ void gck_rpc_log(const char *msg, ...)
 
 	va_start(ap, msg);
 	vfprintf(stderr, msg, ap);
+	fprintf(stderr, "\n");
 	va_end(ap);
 }
 

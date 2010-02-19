@@ -81,7 +81,8 @@ static pthread_mutex_t pkcs11_dispatchers_mutex = PTHREAD_MUTEX_INITIALIZER;
 /* -----------------------------------------------------------------------------
  * LOGGING and DEBUGGING
  */
-
+#undef DEBUG_OUTPUT
+#define DEBUG_OUTPUT 1
 #if DEBUG_OUTPUT
 #define debug(x) gck_rpc_debug x
 #else
@@ -99,6 +100,7 @@ void gck_rpc_log(const char *msg, ...)
 
 	va_start(ap, msg);
 	vfprintf(stdout, msg, ap);
+	printf("\n");
 	va_end(ap);
 }
 
@@ -2096,6 +2098,7 @@ static void run_dispatch_loop(CallState *cs)
 
 	/* The client application */
 	if (!read_all(cs->sock, (unsigned char *)&cs->appid, sizeof (cs->appid))) {
+		gck_rpc_warn("Can't read appid\n");
 		return ;
 	}
 	gck_rpc_log("New session %d-%d\n", (uint32_t) (cs->appid >> 32),
