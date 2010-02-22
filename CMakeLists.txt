@@ -11,7 +11,15 @@ set(PKCS11_DAEMON_SRCS egg-buffer.c gck-rpc-daemon-standalone.c gck-rpc-dispatch
 
 add_definitions(-Wall)
 add_library(pkcs11-proxy SHARED ${PKCS11_PROXY_SRCS})
-add_executable (pkcs11-daemon ${PKCS11_DAEMON_SRCS})
+
+# Disable console when building Win32 binary in release mode
+if (WIN32)
+  if("${CMAKE_BUILD_TYPE}" MATCHES "^Rel.*")
+    set(GUI_TYPE WIN32)
+  endif()
+endif()
+
+add_executable (pkcs11-daemon ${GUI_TYPE} ${PKCS11_DAEMON_SRCS})
 
 set_target_properties(pkcs11-proxy PROPERTIES VERSION 0.1 SOVERSION 0)
 
