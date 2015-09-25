@@ -14,19 +14,19 @@ OpenDNSSEC project).  The benefit of this setup is that no extra hardware
 is needed at all.  This could also be considered the greatest weakeness.
 For demonstration purposes, however, security is not a consideration.
 
-$ sudo adduser cgielen pkcs11
-$ sudo adduser cgielen softhsm
+  $ sudo adduser cgielen pkcs11
+  $ sudo adduser cgielen softhsm
 
-$ softhsm --init-token --slot 0 --label test
-The SO PIN must have a length between 4 and 255 characters.
-Enter SO PIN:
-The user PIN must have a length between 4 and 255 characters.
-Enter user PIN:
-The token has been initialized.
-
-$ PKCS11_DAEMON_SOCKET="tcp://127.0.0.1:2345" pkcs11-daemon /usr/lib/libsofthsm.so
-$ PKCS11_PROXY_SOCKET="tcp://127.0.0.1:2345" pkcs11-tool --module=/usr/lib/libpkcs11-proxy.so -L Available
-slots: Slot 0           SoftHSM
-  token label:   test token manuf:   SoftHSM token model:   SoftHSM
-  token flags:   rng, login required, PIN initialized, token initialized,
-  other flags=0x40 serial num  :  1
+  $ softhsm --init-token --slot 0 --label test
+  The SO PIN must have a length between 4 and 255 characters.
+  Enter SO PIN:
+  The user PIN must have a length between 4 and 255 characters.
+  Enter user PIN:
+  The token has been initialized.
+  
+  $ PKCS11_DAEMON_SOCKET="tcp://127.0.0.1:2345" pkcs11-daemon /usr/lib/libsofthsm.so
+  $ PKCS11_PROXY_SOCKET="tcp://127.0.0.1:2345" pkcs11-tool --module=/usr/lib/libpkcs11-proxy.so -L Available
+  slots: Slot 0           SoftHSM
+    token label:   test token manuf:   SoftHSM token model:   SoftHSM
+    token flags:   rng, login required, PIN initialized, token initialized,
+    other flags=0x40 serial num  :  1
