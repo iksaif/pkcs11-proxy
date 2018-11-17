@@ -30,3 +30,6 @@ For demonstration purposes, however, security is not a consideration.
       token label:   test token manuf:   SoftHSM token model:   SoftHSM
       token flags:   rng, login required, PIN initialized, token initialized,
       other flags=0x40 serial num  :  1
+      
+
+Another implementation can be found at https://github.com/hajikhorasani/cryptokimpx
