@@ -90,7 +90,7 @@ static pthread_mutex_t pkcs11_dispatchers_mutex = PTHREAD_MUTEX_INITIALIZER;
 #define warning(x) gck_rpc_warn x
 
 #define return_val_if_fail(x, v) \
-	if (!(x)) { rpc_warn ("'%s' not true at %s", #x, __func__); return v; }
+	if (!(x)) { gck_rpc_warn ("'%s' not true at %s", #x, __func__); return v; }
 
 void gck_rpc_log(const char *msg, ...)
 {

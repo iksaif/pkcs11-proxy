@@ -98,8 +98,8 @@ int main(int argc, char *argv[])
 	rv = (func_get_list) (&funcs);
 	if (rv != CKR_OK || !funcs) {
 		fprintf(stderr,
-			"couldn't get function list from C_GetFunctionList"
-			"in libary: %s: 0x%08x\n",
+			"couldn't get function list from C_GetFunctionList "
+			"in library: %s: 0x%08x\n",
 			argv[1], (int)rv);
 		exit(1);
 	}
