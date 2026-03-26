@@ -1,40 +1,60 @@
-cmake_minimum_required (VERSION 2.4)
+cmake_minimum_required(VERSION 3.10)
 
-if(COMMAND cmake_policy)
-      cmake_policy(SET CMP0003 NEW)
-endif(COMMAND cmake_policy)
+project(pkcs11-proxy VERSION 0.1.0 LANGUAGES C)
 
-project (pkcs11 C)
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 
-set(PKCS11_PROXY_SRCS gck-rpc-module.c gck-rpc-message.c gck-rpc-util.c egg-buffer.c)
-set(PKCS11_DAEMON_SRCS egg-buffer.c gck-rpc-daemon-standalone.c gck-rpc-dispatch.c gck-rpc-message.c gck-rpc-util.c)
+option(BUILD_TESTING "Build tests" ON)
 
-add_definitions(-Wall)
+# Common source lists
+set(COMMON_SRCS gck-rpc-message.c gck-rpc-util.c egg-buffer.c)
+set(PKCS11_PROXY_SRCS gck-rpc-module.c ${COMMON_SRCS})
+set(PKCS11_DAEMON_SRCS gck-rpc-daemon-standalone.c gck-rpc-dispatch.c ${COMMON_SRCS})
+
+add_compile_options(-Wall -Wextra -Wno-unused-parameter)
+
+# --- pkcs11-proxy shared library ---
 add_library(pkcs11-proxy SHARED ${PKCS11_PROXY_SRCS})
+target_include_directories(pkcs11-proxy PRIVATE ${CMAKE_SOURCE_DIR})
+set_target_properties(pkcs11-proxy PROPERTIES
+    VERSION ${PROJECT_VERSION}
+    SOVERSION 0
+)
 
+# --- pkcs11-daemon executable ---
 # Disable console when building Win32 binary in release mode
-if (WIN32)
-  if("${CMAKE_BUILD_TYPE}" MATCHES "^Rel.*")
+if(WIN32 AND CMAKE_BUILD_TYPE MATCHES "^Rel.*")
     set(GUI_TYPE WIN32)
-  endif()
 endif()
 
-add_executable (pkcs11-daemon ${GUI_TYPE} ${PKCS11_DAEMON_SRCS})
+add_executable(pkcs11-daemon ${GUI_TYPE} ${PKCS11_DAEMON_SRCS})
+target_include_directories(pkcs11-daemon PRIVATE ${CMAKE_SOURCE_DIR})
 
-set_target_properties(pkcs11-proxy PROPERTIES VERSION 0.1 SOVERSION 0)
+# --- Platform-specific linking ---
+if(WIN32)
+    target_include_directories(pkcs11-proxy PRIVATE ext/include)
+    target_include_directories(pkcs11-daemon PRIVATE ext/include)
 
-if (WIN32)
-  include_directories("ext/include")
+    add_library(dl STATIC IMPORTED)
+    set_property(TARGET dl PROPERTY
+        IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/ext/lib/libdl.a)
 
-  add_library(dl STATIC IMPORTED)
-  set_property(TARGET dl PROPERTY
-               IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/ext/lib/libdl.a)
-  target_link_libraries (pkcs11-daemon ws2_32)
-  target_link_libraries (pkcs11-proxy ws2_32)
-endif (WIN32)
+    target_link_libraries(pkcs11-daemon PRIVATE ws2_32)
+    target_link_libraries(pkcs11-proxy PRIVATE ws2_32)
+endif()
 
-target_link_libraries (pkcs11-proxy pthread)
-target_link_libraries (pkcs11-daemon dl pthread)
+find_package(Threads REQUIRED)
+target_link_libraries(pkcs11-proxy PRIVATE Threads::Threads)
+target_link_libraries(pkcs11-daemon PRIVATE ${CMAKE_DL_LIBS} Threads::Threads)
 
-install_targets (/lib pkcs11-proxy)
-install_targets (/bin pkcs11-daemon)
+# --- Install ---
+include(GNUInstallDirs)
+install(TARGETS pkcs11-proxy LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS pkcs11-daemon RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# --- Tests ---
+if(BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
