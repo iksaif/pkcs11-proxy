@@ -637,10 +637,30 @@ extern "C" {
 #define CKM_AES_MAC			(0x1083UL)
 #define CKM_AES_MAC_GENERAL		(0x1084UL)
 #define CKM_AES_CBC_PAD			(0x1085UL)
+#define CKM_AES_CTR			(0x1086UL)
+#define CKM_AES_GCM			(0x1087UL)
+#define CKM_AES_CCM			(0x1088UL)
+#define CKM_AES_CTS			(0x1089UL)
+#define CKM_AES_CMAC			(0x108AUL)
+#define CKM_AES_CMAC_GENERAL		(0x108BUL)
+#define CKM_AES_KEY_WRAP		(0x2109UL)
+#define CKM_AES_KEY_WRAP_PAD		(0x210AUL)
 #define CKM_DSA_PARAMETER_GEN		(0x2000UL)
 #define CKM_DH_PKCS_PARAMETER_GEN	(0x2001UL)
 #define CKM_X9_42_DH_PARAMETER_GEN	(0x2002UL)
 #define CKM_VENDOR_DEFINED		((unsigned long) (1UL << 31))
+
+	struct ck_gcm_params {
+		unsigned char *pIv;
+		unsigned long ulIvLen;
+		unsigned long ulIvBits;
+		unsigned char *pAAD;
+		unsigned long ulAADLen;
+		unsigned long ulTagBits;
+	};
+
+	typedef struct ck_gcm_params CK_GCM_PARAMS;
+	typedef CK_GCM_PARAMS *CK_GCM_PARAMS_PTR;
 
 	struct ck_mechanism {
 		ck_mechanism_type_t mechanism;

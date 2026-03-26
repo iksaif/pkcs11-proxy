@@ -254,7 +254,16 @@ TEST(test_mechanism_sane_parameters)
 {
 	assert(gck_rpc_mechanism_has_sane_parameters(CKM_RSA_PKCS_OAEP));
 	assert(gck_rpc_mechanism_has_sane_parameters(CKM_RSA_PKCS_PSS));
+	assert(gck_rpc_mechanism_has_sane_parameters(CKM_AES_CBC));
+	assert(gck_rpc_mechanism_has_sane_parameters(CKM_AES_CBC_PAD));
 	assert(!gck_rpc_mechanism_has_sane_parameters(CKM_RSA_PKCS));
+}
+
+TEST(test_mechanism_pointer_parameters)
+{
+	assert(gck_rpc_mechanism_has_pointer_parameters(CKM_AES_GCM));
+	assert(!gck_rpc_mechanism_has_pointer_parameters(CKM_RSA_PKCS));
+	assert(!gck_rpc_mechanism_has_pointer_parameters(CKM_AES_CBC));
 }
 
 TEST(test_mechanism_is_supported)
@@ -262,6 +271,8 @@ TEST(test_mechanism_is_supported)
 	assert(gck_rpc_mechanism_is_supported(CKM_RSA_PKCS));
 	assert(gck_rpc_mechanism_is_supported(CKM_RSA_PKCS_OAEP));
 	assert(gck_rpc_mechanism_is_supported(CKM_SHA256));
+	assert(gck_rpc_mechanism_is_supported(CKM_AES_GCM));
+	assert(gck_rpc_mechanism_is_supported(CKM_AES_CBC));
 }
 
 /* --- Ulong parameter detection --- */
@@ -330,6 +341,7 @@ int main(void)
 	RUN_TEST(test_call_table_consistency);
 	RUN_TEST(test_mechanism_no_parameters);
 	RUN_TEST(test_mechanism_sane_parameters);
+	RUN_TEST(test_mechanism_pointer_parameters);
 	RUN_TEST(test_mechanism_is_supported);
 	RUN_TEST(test_has_ulong_parameter);
 	RUN_TEST(test_parse_invalid_call_id);

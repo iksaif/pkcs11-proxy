@@ -63,7 +63,8 @@ void gck_rpc_debug(const char *msg, ...)
 int gck_rpc_mechanism_is_supported(CK_MECHANISM_TYPE mech)
 {
 	if (gck_rpc_mechanism_has_no_parameters(mech) ||
-	    gck_rpc_mechanism_has_sane_parameters(mech))
+	    gck_rpc_mechanism_has_sane_parameters(mech) ||
+	    gck_rpc_mechanism_has_pointer_parameters(mech))
 		return 1;
 	return 0;
 }
@@ -77,8 +78,7 @@ gck_rpc_mechanism_list_purge(CK_MECHANISM_TYPE_PTR mechs, CK_ULONG * n_mechs)
 	assert(n_mechs);
 
 	for (i = 0; i < (int)(*n_mechs); ++i) {
-		if (!gck_rpc_mechanism_has_no_parameters(mechs[i]) &&
-		    !gck_rpc_mechanism_has_sane_parameters(mechs[i])) {
+		if (!gck_rpc_mechanism_is_supported(mechs[i])) {
 
 			/* Remove the mechanism from the list */
 			memmove(&mechs[i], &mechs[i + 1],
@@ -92,10 +92,27 @@ gck_rpc_mechanism_list_purge(CK_MECHANISM_TYPE_PTR mechs, CK_ULONG * n_mechs)
 
 int gck_rpc_mechanism_has_sane_parameters(CK_MECHANISM_TYPE type)
 {
-	/* This list is incomplete */
+	/* Mechanisms whose parameter struct contains only primitive types
+	 * (no pointers) and can be serialized as a flat byte blob. */
 	switch (type) {
 	case CKM_RSA_PKCS_OAEP:
 	case CKM_RSA_PKCS_PSS:
+	case CKM_AES_CBC:
+	case CKM_AES_CBC_PAD:
+	case CKM_AES_CTR:
+	case CKM_AES_CTS:
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+int gck_rpc_mechanism_has_pointer_parameters(CK_MECHANISM_TYPE mech)
+{
+	/* Mechanisms whose parameter struct contains pointers and
+	 * need custom serialization/deserialization. */
+	switch (mech) {
+	case CKM_AES_GCM:
 		return 1;
 	default:
 		return 0;

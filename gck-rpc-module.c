@@ -933,13 +933,22 @@ static CK_RV proto_write_mechanism(GckRpcMessage * msg, CK_MECHANISM_PTR mech)
 	 * pointing to garbage if they don't think it's going to be used.
 	 */
 
-	if (gck_rpc_mechanism_has_no_parameters(mech->mechanism))
+	if (gck_rpc_mechanism_has_no_parameters(mech->mechanism)) {
 		egg_buffer_add_byte_array(&msg->buffer, NULL, 0);
-	else if (gck_rpc_mechanism_has_sane_parameters(mech->mechanism))
+	} else if (gck_rpc_mechanism_has_sane_parameters(mech->mechanism)) {
 		egg_buffer_add_byte_array(&msg->buffer, mech->pParameter,
 					  mech->ulParameterLen);
-	else
+	} else if (mech->mechanism == CKM_AES_GCM) {
+		CK_GCM_PARAMS_PTR p = (CK_GCM_PARAMS_PTR)mech->pParameter;
+		if (!p)
+			return CKR_MECHANISM_PARAM_INVALID;
+		egg_buffer_add_byte_array(&msg->buffer, p->pIv, p->ulIvLen);
+		egg_buffer_add_uint64(&msg->buffer, p->ulIvBits);
+		egg_buffer_add_byte_array(&msg->buffer, p->pAAD, p->ulAADLen);
+		egg_buffer_add_uint64(&msg->buffer, p->ulTagBits);
+	} else {
 		return CKR_MECHANISM_INVALID;
+	}
 
 	return egg_buffer_has_error(&msg->buffer) ? CKR_HOST_MEMORY : CKR_OK;
 }

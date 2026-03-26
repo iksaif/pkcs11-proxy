@@ -568,14 +568,50 @@ static CK_RV proto_read_mechanism(CallState * cs, CK_MECHANISM_PTR mech)
 	    (&msg->buffer, msg->parsed, &msg->parsed, &value))
 		return PARSE_ERROR;
 
-	/* The mechanism data */
-	if (!egg_buffer_get_byte_array
-	    (&msg->buffer, msg->parsed, &msg->parsed, &data, &n_data))
-		return PARSE_ERROR;
-
 	mech->mechanism = value;
-	mech->pParameter = (CK_VOID_PTR) data;
-	mech->ulParameterLen = n_data;
+
+	if (mech->mechanism == CKM_AES_GCM) {
+		CK_GCM_PARAMS *p;
+		const unsigned char *iv_data, *aad_data;
+		size_t iv_len, aad_len;
+		uint64_t iv_bits, tag_bits;
+
+		if (!egg_buffer_get_byte_array(&msg->buffer, msg->parsed,
+					       &msg->parsed, &iv_data, &iv_len))
+			return PARSE_ERROR;
+		if (!egg_buffer_get_uint64(&msg->buffer, msg->parsed,
+					   &msg->parsed, &iv_bits))
+			return PARSE_ERROR;
+		if (!egg_buffer_get_byte_array(&msg->buffer, msg->parsed,
+					       &msg->parsed, &aad_data, &aad_len))
+			return PARSE_ERROR;
+		if (!egg_buffer_get_uint64(&msg->buffer, msg->parsed,
+					   &msg->parsed, &tag_bits))
+			return PARSE_ERROR;
+
+		p = call_alloc(cs, sizeof(CK_GCM_PARAMS));
+		if (!p)
+			return CKR_DEVICE_MEMORY;
+
+		p->pIv = (CK_BYTE_PTR)iv_data;
+		p->ulIvLen = iv_len;
+		p->ulIvBits = (CK_ULONG)iv_bits;
+		p->pAAD = (CK_BYTE_PTR)aad_data;
+		p->ulAADLen = aad_len;
+		p->ulTagBits = (CK_ULONG)tag_bits;
+
+		mech->pParameter = p;
+		mech->ulParameterLen = sizeof(CK_GCM_PARAMS);
+	} else {
+		/* The mechanism data (flat blob) */
+		if (!egg_buffer_get_byte_array
+		    (&msg->buffer, msg->parsed, &msg->parsed, &data, &n_data))
+			return PARSE_ERROR;
+
+		mech->pParameter = (CK_VOID_PTR) data;
+		mech->ulParameterLen = n_data;
+	}
+
 	return CKR_OK;
 }
 
