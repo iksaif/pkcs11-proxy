@@ -277,14 +277,20 @@ gck_rpc_message_write_attribute_array(GckRpcMessage * msg,
 
 		/* The attribute length and value */
 		if (validity) {
-			egg_buffer_add_uint32(&msg->buffer, attr->ulValueLen);
-			if (gck_rpc_has_bad_sized_ulong_parameter(attr)) {
+			if (gck_rpc_has_ulong_parameter(attr->type) &&
+			    attr->pValue && attr->ulValueLen == sizeof(CK_ULONG)) {
+				/* Always transmit ulong parameters as uint64_t for
+				 * cross-platform 32/64-bit compatibility */
 				uint64_t val = *(CK_ULONG *)attr->pValue;
-
-				egg_buffer_add_byte_array (&msg->buffer, (unsigned char *)&val, sizeof (val));
-			} else
+				egg_buffer_add_uint32(&msg->buffer, sizeof(uint64_t));
+				egg_buffer_add_byte_array(&msg->buffer,
+							  (unsigned char *)&val,
+							  sizeof(val));
+			} else {
+				egg_buffer_add_uint32(&msg->buffer, attr->ulValueLen);
 				egg_buffer_add_byte_array(&msg->buffer, attr->pValue,
 							  attr->ulValueLen);
+			}
 		}
 	}
 

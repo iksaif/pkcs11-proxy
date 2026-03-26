@@ -233,16 +233,3 @@ gck_rpc_has_ulong_parameter(CK_ATTRIBUTE_TYPE type)
 	}
 }
 
-int
-gck_rpc_has_bad_sized_ulong_parameter(CK_ATTRIBUTE_PTR attr)
-{
-	if (!attr->pValue)
-		return 0;
-	/* All this parameters are transmited on the network
-	 * as 64bit integers */
-	if (sizeof (uint64_t) != attr->ulValueLen)
-		return 0;
-	if (sizeof (CK_ULONG) == attr->ulValueLen)
-		return 0;
-	return gck_rpc_has_ulong_parameter(attr->type);
-}

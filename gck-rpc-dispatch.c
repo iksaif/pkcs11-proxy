@@ -465,17 +465,22 @@ proto_read_attribute_array(CallState * cs, CK_ATTRIBUTE_PTR * result,
 				return PARSE_ERROR;
 			}
 
-			CK_ULONG a;
-
-			if (value == sizeof (uint64_t) &&
-			    value != sizeof (CK_ULONG) &&
+			/* Ulong parameters are always transmitted as uint64_t
+			 * for cross-platform 32/64-bit compatibility. Convert
+			 * back to local CK_ULONG size. */
+			if (value == sizeof(uint64_t) &&
+			    value != sizeof(CK_ULONG) &&
 			    gck_rpc_has_ulong_parameter(attrs[i].type)) {
-
-				value = sizeof (CK_ULONG);
-				a = *(uint64_t *)data;
-				*(CK_ULONG *)data = a;
+				CK_ULONG a;
+				a = (CK_ULONG)(*(uint64_t *)data);
+				value = sizeof(CK_ULONG);
+				attrs[i].pValue = call_alloc(cs, sizeof(CK_ULONG));
+				if (!attrs[i].pValue)
+					return CKR_DEVICE_MEMORY;
+				*(CK_ULONG *)attrs[i].pValue = a;
+			} else {
+				attrs[i].pValue = (CK_VOID_PTR) data;
 			}
-			attrs[i].pValue = (CK_VOID_PTR) data;
 			attrs[i].ulValueLen = value;
 		} else {
 			attrs[i].pValue = NULL;
