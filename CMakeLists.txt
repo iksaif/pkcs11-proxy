@@ -36,17 +36,20 @@ if(WIN32)
     target_include_directories(pkcs11-proxy PRIVATE ext/include)
     target_include_directories(pkcs11-daemon PRIVATE ext/include)
 
-    add_library(dl STATIC IMPORTED)
-    set_property(TARGET dl PROPERTY
-        IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/ext/lib/libdl.a)
+    add_library(dlfcn-win32 STATIC ext/src/dlfcn.c)
+    target_include_directories(dlfcn-win32 PUBLIC ext/include)
 
-    target_link_libraries(pkcs11-daemon PRIVATE ws2_32)
+    target_link_libraries(pkcs11-daemon PRIVATE ws2_32 dlfcn-win32)
     target_link_libraries(pkcs11-proxy PRIVATE ws2_32)
 endif()
 
 find_package(Threads REQUIRED)
 target_link_libraries(pkcs11-proxy PRIVATE Threads::Threads)
-target_link_libraries(pkcs11-daemon PRIVATE ${CMAKE_DL_LIBS} Threads::Threads)
+if(WIN32)
+    target_link_libraries(pkcs11-daemon PRIVATE Threads::Threads)
+else()
+    target_link_libraries(pkcs11-daemon PRIVATE ${CMAKE_DL_LIBS} Threads::Threads)
+endif()
 
 # --- Install ---
 include(GNUInstallDirs)
