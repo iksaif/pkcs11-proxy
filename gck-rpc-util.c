@@ -76,13 +76,13 @@ gck_rpc_mechanism_list_purge(CK_MECHANISM_TYPE_PTR mechs, CK_ULONG * n_mechs)
 	assert(mechs);
 	assert(n_mechs);
 
-	for (i = 0; i < (int)(*mechs); ++i) {
+	for (i = 0; i < (int)(*n_mechs); ++i) {
 		if (!gck_rpc_mechanism_has_no_parameters(mechs[i]) &&
 		    !gck_rpc_mechanism_has_sane_parameters(mechs[i])) {
 
 			/* Remove the mechanism from the list */
 			memmove(&mechs[i], &mechs[i + 1],
-				(*n_mechs - i) * sizeof(CK_MECHANISM_TYPE));
+				(*n_mechs - i - 1) * sizeof(CK_MECHANISM_TYPE));
 
 			--(*n_mechs);
 			--i;

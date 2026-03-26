@@ -81,8 +81,6 @@ static pthread_mutex_t pkcs11_dispatchers_mutex = PTHREAD_MUTEX_INITIALIZER;
 /* -----------------------------------------------------------------------------
  * LOGGING and DEBUGGING
  */
-#undef DEBUG_OUTPUT
-#define DEBUG_OUTPUT 1
 #if DEBUG_OUTPUT
 #define debug(x) gck_rpc_debug x
 #else
@@ -2270,18 +2268,14 @@ int gck_rpc_layer_initialize(const char *prefix, CK_FUNCTION_LIST_PTR module)
 
 	if (!strncmp("tcp://", prefix, 6)) {
 		int one = 1, port;
-		char *p = NULL;
-		const char *ip;
+		char *ip, *p;
 
 		ip = strdup(prefix + 6);
-		if (ip)
-			p = strchr(ip, ':');
-
 		if (!ip) {
-			gck_rpc_warn("invalid syntax for pkcs11 socket : %s",
-				     prefix);
+			gck_rpc_warn("couldn't allocate memory");
 			return -1;
 		}
+		p = strchr(ip, ':');
 
 		if (p) {
 			*p = '\0';
@@ -2294,21 +2288,26 @@ int gck_rpc_layer_initialize(const char *prefix, CK_FUNCTION_LIST_PTR module)
 		if (sock < 0) {
 			gck_rpc_warn("couldn't create pkcs11 socket: %s",
 				     strerror(errno));
+			free(ip);
 			return -1;
 		}
 
-                if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
-                               (char *)&one, sizeof (one)) == -1) {
-                        gck_rpc_warn("couldn't create set pkcs11 "
-				 "socket options : %s", strerror (errno));
-                        return -1;
-                }
+		if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
+			       (char *)&one, sizeof(one)) == -1) {
+			gck_rpc_warn("couldn't set pkcs11 "
+				 "socket options : %s", strerror(errno));
+			close(sock);
+			free(ip);
+			return -1;
+		}
 
 		if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
-                               (char *)&one, sizeof(one)) == -1) {
+			       (char *)&one, sizeof(one)) == -1) {
 			gck_rpc_warn
-			    ("couldn't create set pkcs11 socket options : %s",
+			    ("couldn't set pkcs11 socket options : %s",
 			     strerror(errno));
+			close(sock);
+			free(ip);
 			return -1;
 		}
 
@@ -2316,9 +2315,12 @@ int gck_rpc_layer_initialize(const char *prefix, CK_FUNCTION_LIST_PTR module)
 		if (inet_aton(ip, &((struct sockaddr_in *)&addr)->sin_addr) ==
 		    0) {
 			gck_rpc_warn("bad inet address : %s", ip);
+			close(sock);
+			free(ip);
 			return -1;
 		}
 		((struct sockaddr_in *)&addr)->sin_port = htons(port);
+		free(ip);
 
 		snprintf(pkcs11_socket_path, sizeof(pkcs11_socket_path),
 			 "%s", prefix);
@@ -2336,19 +2338,21 @@ int gck_rpc_layer_initialize(const char *prefix, CK_FUNCTION_LIST_PTR module)
 
 		addr.sun_family = AF_UNIX;
 		unlink(pkcs11_socket_path);
-		strncpy(addr.sun_path, pkcs11_socket_path,
-			sizeof(addr.sun_path));
+		snprintf(addr.sun_path, sizeof(addr.sun_path), "%s",
+			 pkcs11_socket_path);
 	}
 
 	if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
 		gck_rpc_warn("couldn't bind to pkcs11 socket: %s: %s",
 			     pkcs11_socket_path, strerror(errno));
+		close(sock);
 		return -1;
 	}
 
 	if (listen(sock, 128) < 0) {
 		gck_rpc_warn("couldn't listen on pkcs11 socket: %s: %s",
 			     pkcs11_socket_path, strerror(errno));
+		close(sock);
 		return -1;
 	}
 
@@ -2361,6 +2365,7 @@ int gck_rpc_layer_initialize(const char *prefix, CK_FUNCTION_LIST_PTR module)
 		if (getsockname(sock, (struct sockaddr *)&sa, &sa_len) == -1) {
 			gck_rpc_warn("getsockname failed on pkcs11 socket: %s: %s",
 				     pkcs11_socket_path, strerror(errno));
+			close(sock);
 			return -1;
 		}
 
